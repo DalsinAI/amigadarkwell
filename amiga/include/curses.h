@@ -86,6 +86,13 @@ typedef chtype attr_t;
 #define KEY_ENTER     0527
 #define KEY_RESIZE    0632
 #define KEY_HELP      AMIGA_KEY_HELP
+/* the PC keypad's corners and centre: ncurses' codes; the Amiga's keypad
+ * sends digits, so these never come, but programs name them */
+#define KEY_A1        0534
+#define KEY_A3        0535
+#define KEY_B2        0536
+#define KEY_C1        0537
+#define KEY_C3        0540
 
 typedef struct acurses_win {
 	int begy, begx;          /* where it is on the screen */
