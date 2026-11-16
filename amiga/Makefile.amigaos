@@ -1,0 +1,76 @@
+# Dark Well for GFOS (AmigaOS 3.2 with GFOpenUp), 68040/68060: the colour
+# columns game (Boris Kozlov, 2000) in its own 80 x 25 console window, in
+# colour, built soft float. No SDL, no ACGame, no GFOpenGPU.
+#
+#   make -f amiga/Makefile.amigaos -j4 UP=/path/to/darkwell [STOVE=...]
+#
+# UP is upstream's 1.0.0 release (package/darkwell.lock) with amiga/patches
+# applied (package/build-amiga.sh does both). STOVE is a GFOpenAmigaGCC
+# 16.2.0-open6 stove (prefix/ has the compiler and the NDK).
+# The game draws through amiga/curses.c (the part of ncurses it uses, sent
+# to the console as ANSI with the eight pens for colour; its PC graphics,
+# CP437, shown as Latin-1 and ASCII, its blocks as reversed spaces), its
+# title and goodbye screens are its own ANSI art through the same mapping;
+# amiga/console_amiga.c opens the window and reads the keys (amiga/keys.c:
+# the cursor keys as KEY_*); amiga/compat_amiga.c is its clock (DateStamp)
+# and random().
+#
+# Output: build/amigaos/DarkWell/ (the drawer: DarkWell, an empty top ten
+# darkwell.score, ReadMe, upstream's README, the licence, GlowIcons),
+# build/amigaos/DarkWell.info and Install-DarkWell beside them.
+
+UP      ?= ../darkwell
+VERSION ?= 1.0.0
+STOVE   ?= $(HOME)/AmiCradle/stoves/os32-gcc16-open6
+PREFIX  ?= $(STOVE)/prefix
+CC      = $(PREFIX)/bin/m68k-amigaos-gcc
+CPU     ?= -m68040 -msoft-float
+# -fno-tree-loop-distribute-patterns: GCC 16's loop miscompile.
+OPT     ?= -Os -fomit-frame-pointer -fno-tree-loop-distribute-patterns
+
+# Upstream is 2000 C: implicit int, a header that defines its arrays
+# (score.h, in two files: -fcommon), calls before their declarations.
+UPFLAGS = -noixemul $(OPT) $(CPU) -std=gnu89 -fpermissive -fcommon -w -D__amigaos__ \
+          -DSCORE_FILE='"PROGDIR:darkwell.score"' \
+          -Dgettimeofday=amiga_gettimeofday -Drandom=amiga_random \
+          -include amiga/include/amiga_prelude.h -Iamiga/include -Iamiga
+MYFLAGS = -noixemul $(OPT) $(CPU) -std=gnu99 -Wall -DACURSES_LINES=25 \
+          -DAMIGA_GAME_TITLE='"Dark Well $(VERSION)"' -Iamiga/include -Iamiga
+LDFLAGS = -noixemul $(CPU)
+
+BUILD   = build/amigaos
+OBJ     = $(BUILD)/obj
+OUT     = $(BUILD)/DarkWell
+
+GAME    = main draw unix score
+PORT    = curses keys console_amiga compat_amiga
+
+all: $(OUT)/DarkWell package
+
+$(OBJ)/up/%.o: $(UP)/%.c $(wildcard amiga/include/*.h)
+	@mkdir -p $(dir $@)
+	$(CC) $(UPFLAGS) -c -o $@ $<
+
+$(OBJ)/port/%.o: amiga/%.c $(wildcard amiga/*.h amiga/include/*.h)
+	@mkdir -p $(dir $@)
+	$(CC) $(MYFLAGS) -c -o $@ $<
+
+$(OUT)/DarkWell: $(GAME:%=$(OBJ)/up/%.o) $(PORT:%=$(OBJ)/port/%.o)
+	@mkdir -p $(OUT)
+	$(CC) $(LDFLAGS) -o $@ $^
+
+package: $(OUT)/DarkWell AMIGA_PORT.md
+	: > $(OUT)/darkwell.score
+	cp AMIGA_PORT.md $(OUT)/ReadMe
+	cp $(UP)/README $(OUT)/ReadMe-DarkWell
+	cp $(UP)/COPYING $(OUT)/COPYING.txt
+	cp amiga/icons/DarkWell.info amiga/icons/ReadMe.info $(OUT)/
+	cp amiga/icons/ReadMe.info $(OUT)/ReadMe-DarkWell.info
+	cp amiga/icons/ReadMe.info $(OUT)/COPYING.txt.info
+	cp amiga/icons/DarkWell-drawer.info $(BUILD)/DarkWell.info
+	cp amiga/Install-DarkWell amiga/Install-DarkWell.info $(BUILD)/
+
+clean:
+	rm -rf $(BUILD)
+
+.PHONY: all package clean

@@ -1,0 +1,102 @@
+diff -ru a/main.c b/main.c
+--- a/main.c
++++ b/main.c
+@@ -42,15 +42,23 @@
+ void makebeep(int freq, int leng)
+ {
+   if (snd) {
++#ifdef __amigaos__
++    beep(); /* the console's bell (no PC speaker tones) */
++#else
+     fprintf(stdout,"\33[10;%d]\33[11;%d]\a\33[10]\33[11]",freq,leng);
+     fflush(stdout);
++#endif
+   }
+ }
+ 
+ void init()
+ {
+   srand(time(0));
++#ifdef __amigaos__
++  acurses_cp437 = 1; /* curses shows the PC's graphics set */
++#else
+   printf("\e(U"); /* set IBM_PC graphics set */      
++#endif
+   initscr();
+   keypad(stdscr,1);
+   meta(stdscr,1);
+@@ -65,12 +73,21 @@
+ {
+   unsigned key=0,k;
+   
++#ifdef __amigaos__
++  acurses_raw(screendata); /* the ANSI screen, CP437 shown by curses */
++  curs_set(0);
++  while(key!=13 && key!=113 && key!=81 && key!=72 && key!=104) {
++    key=acurses_key(0,-1);
++    if (key==(unsigned)-2) exiting(1); /* the window closed */
++  }
++#else
+   printf("%s",screendata); 
+   endwin();
+ 
+   curs_set(0);  
+   cbreak();    
+   while(key!=13 && key!=113 && key!=81 && key!=72 && key!=104) key=getchar();
++#endif
+ 
+   
+   switch(key) {
+@@ -90,14 +107,21 @@
+   nonl();   /* don't wait for carriage return */
+   cbreak();  
+   curs_set(1);  	    
++#ifdef __amigaos__
++  acurses_raw(byedata);
++  acurses_key(0,5000); /* the window closes as the game ends: a look first */
++#else
+   printf("%s",byedata); 
++#endif
+   endwin();
+ }
+ 
+ void exiting(unsigned mode)
+ {
+   clear();  
++#ifndef __amigaos__
+   printw("\e(B"); // set unix character set 
++#endif
+   if (!mode) byescr();   //0-normal quit
+   exit(0);  
+ } //exiting
+@@ -122,7 +146,7 @@
+    timeout(delay);
+    lastkey=getch();
+    timeout(-1);
+-#ifndef NCURSES_VERSION /* workaround for not working timeout(-1) */
++#if !defined(NCURSES_VERSION) && !defined(__amigaos__) /* workaround for not working timeout(-1) */
+    nocbreak(); cbreak();
+ #endif
+    return lastkey;
+diff -ru a/score.c b/score.c
+--- a/score.c
++++ b/score.c
+@@ -23,7 +23,9 @@
+ #include <errno.h>
+ #include <time.h>
+ 
++#ifndef SCORE_FILE /* the Amiga's: beside the program (PROGDIR:) */
+ #define SCORE_FILE "darkwell.score"
++#endif
+ 
+ static unsigned char numofscore=0;
+ 
+@@ -187,7 +189,7 @@
+   noecho ();
+   keypad (stdscr,1);
+   curs_set(0); 
+-  if (pos < n) str[pos] = '\0';
++  str[pos] = '\0'; /* nine letters fill the buffer's first nine */
+ } //readname 
+ 
+ //--------------------------------------------------------------------------
