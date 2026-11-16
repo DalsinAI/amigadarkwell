@@ -1,0 +1,14 @@
+{
+  "name": "DarkWell",
+  "version": "1.0.0-gfos1",
+  "drawer": "DarkWell",
+  "program": "DarkWell",
+  "cpu": "68040",
+  "fpu": false,
+  "space": 200000,
+  "modules": [],
+  "parent": "Work:Games",
+  "badge": "icons/art/darkwell.png",
+  "keep": ["darkwell.score"],
+  "script": "Install-DarkWell"
+}

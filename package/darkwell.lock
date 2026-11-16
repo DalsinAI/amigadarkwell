@@ -1,0 +1,7 @@
+# Upstream Dark Well: the 1.0.0 release, from the games archive on ibiblio
+# (sunsite's Linux games/arcade); its only release. Fetched at build time,
+# never kept here, checked against its SHA-256.
+UP_URL=https://www.ibiblio.org/pub/micro/pc-stuff/Linux/games/arcade/darkwell-1.0.0.tar.gz
+UP_SHA256=13b6a507c268dad709803ab6f72add22479c45e1aafb8ed103910b7471654bcd
+UP_VERSION=1.0.0
+PORT_VERSION=1.0.0-gfos1
