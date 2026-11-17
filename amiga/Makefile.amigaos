@@ -7,18 +7,20 @@
 # UP is upstream's 1.0.0 release (package/darkwell.lock) with amiga/patches
 # applied (package/build-amiga.sh does both). STOVE is a GFOpenAmigaGCC
 # 16.2.0-open6 stove (prefix/ has the compiler and the NDK).
-# The game draws through amiga/curses.c (the part of ncurses it uses, sent
-# to the console as ANSI with the eight pens for colour; its PC graphics,
-# CP437, shown as Latin-1 and ASCII, its blocks as reversed spaces), its
-# title and goodbye screens are its own ANSI art through the same mapping;
-# amiga/console_amiga.c opens the window and reads the keys (amiga/keys.c:
-# the cursor keys as KEY_*); amiga/compat_amiga.c is its clock (DateStamp)
-# and random().
+# The game draws through GFOpenCurses (DalsinAI/gfopencurses, at the
+# commit package/gfopencurses.lock names, built first: GFOPENCURSES is its
+# checkout), sent to the console as ANSI with the eight pens for colour;
+# its PC graphics, CP437, shown as Latin-1 and ASCII, its blocks as
+# reversed spaces; its title and goodbye screens are its own ANSI art
+# through the same mapping. GFOpenCurses opens the window and reads the
+# keys (the cursor keys as KEY_*); amiga/screen.c makes the window 25 lines
+# and titles it; amiga/compat_amiga.c is its clock (DateStamp) and random().
 #
 # Output: build/amigaos/DarkWell/ (the drawer: DarkWell, an empty top ten
 # darkwell.score, ReadMe, upstream's README, the licence, GlowIcons),
 # build/amigaos/DarkWell.info and Install-DarkWell beside them.
 
+GFOPENCURSES ?= ../gfopencurses
 UP      ?= ../darkwell
 VERSION ?= 1.0.0
 STOVE   ?= $(HOME)/AmiCradle/stoves/os32-gcc16-open6
@@ -33,9 +35,9 @@ OPT     ?= -Os -fomit-frame-pointer -fno-tree-loop-distribute-patterns
 UPFLAGS = -noixemul $(OPT) $(CPU) -std=gnu89 -fpermissive -fcommon -w -D__amigaos__ \
           -DSCORE_FILE='"PROGDIR:darkwell.score"' \
           -Dgettimeofday=amiga_gettimeofday -Drandom=amiga_random \
-          -include amiga/include/amiga_prelude.h -Iamiga/include -Iamiga
-MYFLAGS = -noixemul $(OPT) $(CPU) -std=gnu99 -Wall -DACURSES_LINES=25 \
-          -DAMIGA_GAME_TITLE='"Dark Well $(VERSION)"' -Iamiga/include -Iamiga
+          -include amiga/include/amiga_prelude.h -I$(GFOPENCURSES)/include -Iamiga/include -Iamiga
+MYFLAGS = -noixemul $(OPT) $(CPU) -std=gnu99 -Wall \
+          -DDARKWELL_TITLE='"Dark Well $(VERSION)"' -I$(GFOPENCURSES)/include -Iamiga/include -Iamiga
 LDFLAGS = -noixemul $(CPU)
 
 BUILD   = build/amigaos
@@ -43,7 +45,7 @@ OBJ     = $(BUILD)/obj
 OUT     = $(BUILD)/DarkWell
 
 GAME    = main draw unix score
-PORT    = curses keys console_amiga compat_amiga
+PORT    = screen compat_amiga
 
 all: $(OUT)/DarkWell package
 
@@ -51,13 +53,13 @@ $(OBJ)/up/%.o: $(UP)/%.c $(wildcard amiga/include/*.h)
 	@mkdir -p $(dir $@)
 	$(CC) $(UPFLAGS) -c -o $@ $<
 
-$(OBJ)/port/%.o: amiga/%.c $(wildcard amiga/*.h amiga/include/*.h)
+$(OBJ)/port/%.o: amiga/%.c $(wildcard amiga/include/*.h)
 	@mkdir -p $(dir $@)
 	$(CC) $(MYFLAGS) -c -o $@ $<
 
 $(OUT)/DarkWell: $(GAME:%=$(OBJ)/up/%.o) $(PORT:%=$(OBJ)/port/%.o)
 	@mkdir -p $(OUT)
-	$(CC) $(LDFLAGS) -o $@ $^
+	$(CC) $(LDFLAGS) -o $@ $^ -L$(GFOPENCURSES)/lib -lgfopencurses
 
 package: $(OUT)/DarkWell AMIGA_PORT.md
 	: > $(OUT)/darkwell.score
