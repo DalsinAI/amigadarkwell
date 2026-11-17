@@ -1,8 +1,8 @@
 #!/bin/sh
 # Host tests for the Amiga port of Dark Well: upstream's game (amiga/patches
 # applied, __amigaos__ set, so the Amiga's paths are the ones built) with
-# amiga/curses.c over a plain terminal (tests/host/console_host.c), played
-# with scripted keys; tests/host/vt.py reads back the 80 x 25 screen as the
+# GFOpenCurses over a plain terminal (its src/console_host.c), played
+# with scripted keys; GFOpenCurses' tests/host/vt.py reads back the 80 x 25 screen as the
 # Amiga's console would show it:
 #  - keys: Return is CR after nonl(), the cursor keys come as KEY_*;
 #  - CP437: the PC's lines and corners as ASCII, its letters as Latin-1,
@@ -32,14 +32,17 @@ export VT_ROWS=25
 mkdir -p "$T/drawer"
 : > "$T/drawer/darkwell.score"
 
-MINE="-std=gnu99 -Wall -Werror -D_XOPEN_SOURCE=600 -D_DEFAULT_SOURCE -DACURSES_LINES=25 -Iamiga/include -Iamiga"
-for f in curses keys; do $CC $MINE -c -o "$T/$f.o" "amiga/$f.c"; done
-$CC $MINE -c -o "$T/con.o" tests/host/console_host.c
+GC=${GFOPENCURSES:?GFOPENCURSES=gfopencurses checkout}
+VT=$GC/tests/host/vt.py
+MINE="-std=gnu99 -Wall -Werror -D_XOPEN_SOURCE=600 -D_DEFAULT_SOURCE -I$GC/include -Iamiga/include -Iamiga"
+for f in curses keys; do $CC $MINE -c -o "$T/$f.o" "$GC/src/$f.c"; done
+$CC $MINE -c -o "$T/con.o" "$GC/src/console_host.c"
+$CC $MINE -c -o "$T/screen.o" amiga/screen.c
 for f in main draw unix score; do
     $CC -std=gnu89 -fpermissive -fcommon -w -D__amigaos__ -DSCORE_FILE="\"$T/drawer/darkwell.score\"" \
-        -include amiga/include/amiga_prelude.h -Iamiga/include -Iamiga -c -o "$T/u_$f.o" "$UP/$f.c"
+        -include amiga/include/amiga_prelude.h -I$GC/include -Iamiga/include -Iamiga -c -o "$T/u_$f.o" "$UP/$f.c"
 done
-$CC -o "$T/darkwell" "$T"/u_*.o "$T/curses.o" "$T/keys.o" "$T/con.o"
+$CC -o "$T/darkwell" "$T"/u_*.o "$T/curses.o" "$T/keys.o" "$T/con.o" "$T/screen.o"
 
 fails=0
 ok() { echo "ok   $1"; }
@@ -73,7 +76,7 @@ int main(void)
 	return bad;
 }
 C
-$CC $MINE -o "$T/units" "$T/units.c" "$T/curses.o" "$T/keys.o" "$T/con.o"
+$CC $MINE -o "$T/units" "$T/units.c" "$T/curses.o" "$T/keys.o" "$T/con.o" "$T/screen.o"
 if "$T/units"; then ok "keys, and CP437 as Latin-1, ASCII lines and reversed blocks"; else bad "units"; fi
 
 # acurses_raw: the text as it is, CP437 mapped, the blocks reversed
@@ -81,7 +84,7 @@ cat > "$T/raw.c" <<'C'
 #include "curses.h"
 int main(void) { acurses_raw("\033[1;1Ha\333b\304c\202"); return 0; }
 C
-$CC $MINE -o "$T/raw" "$T/raw.c" "$T/curses.o" "$T/keys.o" "$T/con.o"
+$CC $MINE -o "$T/raw" "$T/raw.c" "$T/curses.o" "$T/keys.o" "$T/con.o" "$T/screen.o"
 "$T/raw" > "$T/raw.out"
 if [ "$(od -An -c "$T/raw.out" | tr -s ' ' | tr -d '\n')" = " 033 [ 1 ; 1 H a 033 [ 7 m 033 [ 2 7 m b - c 351" ]; then
     ok "acurses_raw: CP437 mapped, a block as CSI 7 m, space, CSI 27 m"
@@ -92,7 +95,7 @@ play() {	# keys (printf format), output
 }
 want() {	# name, output, vt.py arguments...
     name=$1; out=$2; shift 2
-    if python3 "$HERE/vt.py" "$out" "$@" > "$T/vt.txt"; then ok "$name"; else bad "$name"; cat "$T/vt.txt"; fi
+    if python3 "$VT" "$out" "$@" > "$T/vt.txt"; then ok "$name"; else bad "$name"; cat "$T/vt.txt"; fi
 }
 
 if play '' "$T/title.out"; then ok "the window's close at the title ends the game"; else bad "the end of the input did not end it"; fi
@@ -105,11 +108,11 @@ play '\r++' "$T/game.out"
 want "Return: the well, the top ten, the stats, the blocks; + raises the speed" "$T/game.out" \
     --want "Top Ten" --want "Stats" --want "Score       : 0" --want "Speed       : 3" --want "Next colors" \
     --want "Quick help" --want "left,j  - move left" --want "+--------------------------+" --reversed 12
-python3 "$HERE/vt.py" "$T/game.out" --blocks | sed -n 2,23p | cut -c28-55 > "$T/well.txt"
+python3 "$VT" "$T/game.out" --blocks | sed -n 2,23p | cut -c28-55 > "$T/well.txt"
 if [ "$(grep -c '^|.*|$' "$T/well.txt")" -ge 20 ]; then ok "the well's walls"; else bad "the well's walls"; cat "$T/well.txt"; fi
 play '\r ' "$T/drop.out"
-python3 "$HERE/vt.py" "$T/drop.out" --blocks | sed -n 21,23p | cut -c28-55 > "$T/floor.txt"
-if grep -q '##' "$T/floor.txt"; then ok "Space drops the block to the floor"; else bad "drop"; python3 "$HERE/vt.py" "$T/drop.out" --blocks; fi
+python3 "$VT" "$T/drop.out" --blocks | sed -n 21,23p | cut -c28-55 > "$T/floor.txt"
+if grep -q '##' "$T/floor.txt"; then ok "Space drops the block to the floor"; else bad "drop"; python3 "$VT" "$T/drop.out" --blocks; fi
 if play '\rqy' "$T/bye.out"; then ok "q and y leave the game"; else bad "q y"; fi
 want "the goodbye screen" "$T/bye.out" --reversed 40
 

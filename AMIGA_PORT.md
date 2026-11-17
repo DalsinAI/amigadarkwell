@@ -24,8 +24,8 @@ How it was ported
 The game is built from upstream's release as it is. Upstream draws with
 the PC's console character set (CP437): its well walls are box-drawing
 lines and its blocks are solid blocks, and its title and goodbye screens
-are PC ANSI art. amiga/curses.c (the part of ncurses it uses, shared with
-our other console ports) now maps CP437 when a program asks: lines and
+are PC ANSI art. GFOpenCurses (DalsinAI/gfopencurses, the curses shared by
+our console ports) maps CP437 when a program asks: lines and
 corners as ASCII, letters as their Latin-1 likeness, shades as : % #, and
 the blocks as a reversed space, which shows as a block in the colour pair's
 pen; acurses_raw() sends the ANSI art through the same mapping. The screen
